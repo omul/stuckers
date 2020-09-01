@@ -1,0 +1,2 @@
+# stuckers
+Checkers-like game
