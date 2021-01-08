@@ -5,21 +5,18 @@ class Player:
     def __init__(self, human, items, directions):
         self.human = human
         self.items = items
-        self.directions = directions
-        
-        
+        self.directions = directions      
+      
 board = 0xaa55aa55aa55aa55
-our = [0x1, 0x4, 0x10, 0x40]
-their = [0x8000000000000000, 0x2000000000000000,
-         0x0800000000000000, 0x0200000000000000]
-
-p1_human=True
-p2_human=False
 
 DIR_LT = 7
 DIR_RT = 9
 DIR_UP = True
 DIR_DN = False
+
+p1=Player(True, [0x1, 0x4, 0x10, 0x40], DIR_UP)
+p2=Player(False, [0x8000000000000000, 0x2000000000000000,
+         0x0800000000000000, 0x0200000000000000], DIR_DN)
 
 def display(val):
     s = format(val, 'b').zfill(64)[::-1]
@@ -29,8 +26,8 @@ def display(val):
     print(out)
 
 def show_board():
-    o = sum(our)
-    t = sum(their)
+    o = sum(p1.items)
+    t = sum(p2.items)
     out = ''
     ret = ''
     for i in range(0, 64):
@@ -73,9 +70,10 @@ def calculate(item, direction):
     return (rr+rl)
 
 def step_allow(item):
-    return True if (item & (board ^ sum(our) ^ sum(their))) > 0 else False
+    return True if (item & (board ^ sum(p1.items) ^ sum(p2.items))) > 0 else False
 
-def move_item(item, direction, incr):
+# Вот тут изменить надо
+def move_item(p, direction, incr):
     c = our[item]<<incr if direction == DIR_UP else our[item]>>incr 
     if step_allow(c):
         our[item] = c
@@ -89,7 +87,7 @@ if __name__ == "__main__":
 
     #    display(sum(our))
         show_board()
-        if p1_human:
+        if p1.human:
             n,d = ask()
             move_item(int(n), DIR_UP, d)
 
