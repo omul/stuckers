@@ -1,12 +1,5 @@
 # checkers-stuckers
 DIM = 8
-
-class Player:
-    def __init__(self, human, items, directions):
-        self.human = human
-        self.items = items
-        self.directions = directions      
-      
 board = 0xaa55aa55aa55aa55
 
 DIR_LT = 7
@@ -14,8 +7,44 @@ DIR_RT = 9
 DIR_UP = True
 DIR_DN = False
 
-p1=Player(True, [0x1, 0x4, 0x10, 0x40], DIR_UP)
-p2=Player(False, [0x8000000000000000, 0x2000000000000000,
+class Player:
+
+    preferred_item: int = 0
+    preferred_incr: int = DIR_RT
+
+    def __init__(self, name, human, items, direction):
+        self.name = name
+        self.human = human
+        self.items = items
+        self.direction = direction
+        self.homerow = 0x55 if self.direction == DIR_UP else 0xAA00000000000000
+
+    def move_item(self):
+        c = self.items[self.preferred_item]<<self.preferred_incr if self.direction == DIR_UP \
+        else self.items[self.preferred_item]>>self.preferred_incr 
+        if step_allow(c):
+            self.items[self.preferred_item] = c
+            return True
+        else:
+            print("{}: Неверный ход...".format(self.name))
+            return False
+      
+    def ask(self):
+        n=0
+        n = input('Введите номер фигуры [{0}-{1}]:'.format(0, len(self.items)-1))
+        if n == 'q':
+            return False
+        if n.isdigit():
+            self.preferred_item = int(n)
+            d = input("Введите направление движения (l или r):")
+            if d == 'l':
+                self.preferred_incr = DIR_LT
+            if d == 'r':
+                self.preferred_incr = DIR_RT
+        return True
+
+p1=Player('1', True, [0x1, 0x4, 0x10, 0x40], DIR_UP)
+p2=Player('2', False, [0x8000000000000000, 0x2000000000000000,
          0x0800000000000000, 0x0200000000000000], DIR_DN)
 
 def display(val):
@@ -25,9 +54,9 @@ def display(val):
         out = out + s[i - 8:i] + '\n'
     print(out)
 
-def show_board():
-    o = sum(p1.items)
-    t = sum(p2.items)
+def show_board(sum_items1, sum_items2):
+    o = sum_items1
+    t = sum_items2
     out = ''
     ret = ''
     for i in range(0, 64):
@@ -41,22 +70,6 @@ def show_board():
     for i in range(64, 0, -8):
         ret = '{0}{1}\n'.format(ret, out[i - 8:i])
     print(ret)
-
-def ask():
-    direction = 0
-    n=0
-    n = input('Введите номер фигуры [{0}-{1}]:'.format(0, len(our)-1))
-    if n == 'q':
-        quit()
-    if n.isdigit():
-        print(n)
-        d = input("Введите направление движения (l или r):")
-        if d == 'l':
-            direction = DIR_LT
-        if d == 'r':
-            direction = DIR_RT
-        print(direction)
-    return (n, direction)
 
 def calculate(item, direction):
     rr = rl = 0
@@ -72,24 +85,15 @@ def calculate(item, direction):
 def step_allow(item):
     return True if (item & (board ^ sum(p1.items) ^ sum(p2.items))) > 0 else False
 
-# Вот тут изменить надо
-def move_item(p, direction, incr):
-    c = our[item]<<incr if direction == DIR_UP else our[item]>>incr 
-    if step_allow(c):
-        our[item] = c
-    else:
-        print("Неверный ход...")
-
 if __name__ == "__main__": 
     working = True
 
     while working:
 
-    #    display(sum(our))
-        show_board()
+        show_board(sum(p1.items), sum(p2.items))
         if p1.human:
-            n,d = ask()
-            move_item(int(n), DIR_UP, d)
+            p1.ask()
+            p1.move_item()
 
 
 
