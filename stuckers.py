@@ -7,7 +7,7 @@ DIR_UP = True
 DIR_DN = False
 
 
-class Table:
+class Table: 
     board = 0xaa55aa55aa55aa55
     items = {}
     
@@ -29,67 +29,112 @@ class Table:
             ret = '{0}{1}\n'.format(ret, out[i - 8:i])
         print(ret)
 
-    def allow(item):
+    def free_cell(item):
         b = sum(list(Table.items.values()))
         return True if (item & (Table.board ^ b)) > 0 else False
+
+    def move(item, direction, increment):
+        return item<<increment if direction == DIR_UP else item>>increment
 
 
 class Player:
 
-    preferred_item: int = 0
-    preferred_incr: int = DIR_RT
+    pref_indx: int = 0
+    pref_incr: int = DIR_RT
 
     def __init__(self, name, human, items, direction):
         self.name = name
         self.human = human
         self.items = items
         self.direction = direction
-        self.homerow = 0x55 if self.direction == DIR_UP else 0xAA00000000000000
-        self.edgerow = 0xAA00000000000000 if self.direction == DIR_UP else 0x55
+        self.upward = self.direction == DIR_UP
+        self.homerow = 0x55 if self.upward else 0xAA00000000000000
+        self.homecells = list(items)
+        self.edgerow = 0xAA00000000000000 if self.upward else 0x55
         Table.items[self.name] = sum(self.items)
 
     def ask(self):
         n=0 
-        n = input('{0}: Введите номер фигуры [{1}-{2}]:'.format(self.name, 0, len(self.items)-1))
+        n = input('{0}: Input index of item [{1}-{2}]:'.format(self.name, 0, len(self.items)-1))
         if n == 'q':
             return False
         if n.isdigit():
-            self.preferred_item = int(n)
-            d = input("{0}: Введите направление движения (l или r):".format(self.name))
+            self.pref_indx = int(n)
+            d = input("{0}: Input direction (l | r):".format(self.name))
             if d == 'l':
-                self.preferred_incr = DIR_LT
+                self.pref_incr = DIR_LT
             if d == 'r':
-                self.preferred_incr = DIR_RT
+                self.pref_incr = DIR_RT
         return True
 
-    def move_item(self):
-        c = self.items[self.preferred_item]<<self.preferred_incr if self.direction == DIR_UP \
-        else self.items[self.preferred_item]>>self.preferred_incr 
-        if Table.allow(c):
+    def turn(self):
+        c = self.items[self.pref_indx]<<self.pref_incr if self.direction == DIR_UP \
+        else self.items[self.pref_indx]>>self.pref_incr 
+        if Table.free_cell(c):
             if c & self.edgerow:
-                self.items.pop(self.preferred_item)
+                self.items.pop(self.pref_indx)
                 self.bifurcation()
             else:
-                self.items[self.preferred_item] = c
+                self.items[self.pref_indx] = c
             Table.items[self.name] = sum(self.items)
             return True
         else:
-            print("{}: Неверный ход...".format(self.name))
+            print("{}: Wrong turn!".format(self.name))
             return False
 
     def bifurcation(self):
-        pass
+        if Table.free_cell(self.homerow):
+            n = 2
+            for i in self.homecells:
+                if Table.free_cell(i):
+                    self.items.append(i)
+                    n-=1
+                if n <= 0:
+                    break
+            return True
+        return False
 
-    def moving_items(self):
+    def open_items_count(self):
         n = 0
         if not self.items:
             return 0
         for i in self.items:
-            if Table.allow(i<<DIR_RT if self.direction == DIR_UP else i>>DIR_RT) or \
-                Table.allow(i<<DIR_LT if self.direction == DIR_UP else i>>DIR_LT):
+            if Table.free_cell(i<<DIR_RT if self.upward else i>>DIR_RT) or \
+                Table.free_cell(i<<DIR_LT if self.upward else i>>DIR_LT):
                 n+=1
         return n
-      
+
+    def prepare(self):
+        self.pref_indx = 0
+        self.pref_incr = DIR_RT
+        cur = 0
+        cnt = 0
+        for idx, item in enumerate(self.items):
+            cur = self.calculate(item)
+            for incr in [DIR_LT, DIR_RT]:
+                nt = Table.move(item, self.direction, incr)
+                if Table.free_cell(nt):
+                    t = self.calculate(nt)
+                    if t >= cnt:
+                        self.pref_indx = idx
+                        self.pref_incr = incr
+                        cnt=t
+        print(self.pref_indx, self.pref_incr, cur, cnt)
+
+    def calculate(self, item):
+        rr = rl = 0
+        cr = item<<DIR_RT if self.upward else item>>DIR_RT
+        cl = item<<DIR_LT if self.upward else item>>DIR_LT
+        
+        if Table.free_cell(cr):
+            rr = 1 + self.calculate(cr)
+        if Table.free_cell(cl):
+            rl = 1 + self.calculate(cl)
+        if item & self.edgerow:
+            rr+=100
+        return (rr+rl)
+
+
 def display(val):
     s = format(val, 'b').zfill(64)[::-1]
     out = ''
@@ -97,36 +142,27 @@ def display(val):
         out = out + s[i - 8:i] + '\n'
     print(out)
 
-def calculate(item, direction):
-    rr = rl = 0
-    cr = item<<DIR_RT if direction == DIR_UP else item>>DIR_RT
-    cl = item<<DIR_LT if direction == DIR_UP else item>>DIR_LT
-    
-    if step_allow(cr):
-        rr = 1 + calculate(cr, direction)
-    if step_allow(cl):
-        rl = 1 + calculate(cl, direction)
-    return (rr+rl)
-
 
 if __name__ == "__main__":
     
     p1=Player('1', True, [0x1, 0x4, 0x10, 0x40], DIR_UP)
-#   p2=Player('2', False, [0x8000000000000000, 0x2000000000000000, 
-#             0x0800000000000000, 0x0200000000000000], DIR_DN)
-    p2=Player('2', False, [0x400000, 0x100000, 0x040000, 0x010000], DIR_DN)
+    p2=Player('2', False, [0x8000000000000000, 0x2000000000000000, 
+             0x0800000000000000, 0x0200000000000000], DIR_DN)
+#    p2=Player('2', False, [0x400000, 0x100000, 0x040000, 0x010000], DIR_DN)
     working = True
 
     while working:
         for p in [p1, p2]:
-            Table.show_board()
-            if not p.moving_items():
+            if not p.open_items_count():
                 print("{}: You lose...".format(p.name))
                 quit()
             if p.human:
+                Table.show_board()
                 while not p.ask():
                     pass
-            p.move_item()
+            else:
+                p.prepare()
+            p.turn()
 
 
         
