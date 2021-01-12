@@ -33,7 +33,7 @@ class Table:
         b = sum(list(Table.items.values()))
         return True if (item & (Table.board ^ b)) > 0 else False
 
-    def move(item, direction, increment):
+    def moveto(item, direction, increment):
         return item<<increment if direction == DIR_UP else item>>increment
 
 
@@ -110,29 +110,33 @@ class Player:
         cur = 0
         cnt = 0
         for idx, item in enumerate(self.items):
-            cur = self.calculate(item)
+            base_items, base_destinition = self.calculate(item)
+            turns_count = len(list(set(base_items)))
             for incr in [DIR_LT, DIR_RT]:
-                nt = Table.move(item, self.direction, incr)
+                nt = Table.moveto(item, self.direction, incr)
                 if Table.free_cell(nt):
-                    t = self.calculate(nt)
-                    if t >= cnt:
+                    ret, l = self.calculate(nt)
+                    t = len(list(set(ret)))
+                    if (turns_count-t) <= cnt:
                         self.pref_indx = idx
                         self.pref_incr = incr
-                        cnt=t
+                        cnt=(turns_count-t)
         print(self.pref_indx, self.pref_incr, cur, cnt)
 
     def calculate(self, item):
-        rr = rl = 0
-        cr = item<<DIR_RT if self.upward else item>>DIR_RT
-        cl = item<<DIR_LT if self.upward else item>>DIR_LT
-        
-        if Table.free_cell(cr):
-            rr = 1 + self.calculate(cr)
-        if Table.free_cell(cl):
-            rl = 1 + self.calculate(cl)
-        if item & self.edgerow:
-            rr+=100
-        return (rr+rl)
+        l = 0
+        ret = [item]
+        if item & self.edgerow > 0:
+            l = 1
+        else:
+            for d in [DIR_RT, DIR_LT]:
+                c = item<<d if self.upward else item>>d
+                if Table.free_cell(c):
+                    _c, _l = self.calculate(c)
+                    ret.extend(_c)
+                    if _l:
+                        l = _l+1
+        return ret, l
 
 
 def display(val):
@@ -148,6 +152,7 @@ if __name__ == "__main__":
     p1=Player('1', True, [0x1, 0x4, 0x10, 0x40], DIR_UP)
     p2=Player('2', False, [0x8000000000000000, 0x2000000000000000, 
              0x0800000000000000, 0x0200000000000000], DIR_DN)
+ 
 #    p2=Player('2', False, [0x400000, 0x100000, 0x040000, 0x010000], DIR_DN)
     working = True
 
