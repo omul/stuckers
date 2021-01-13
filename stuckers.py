@@ -1,13 +1,12 @@
-# checkers-stuckers
-DIM = 8
-
+""" Stuckers. This is a checkers like game """
 DIR_LT = 7
 DIR_RT = 9
 DIR_UP = True
 DIR_DN = False
 
 
-class Table: 
+class Table:
+    """ Global functions and communication between players. """
     board = 0xaa55aa55aa55aa55
     items = {}
     
@@ -38,7 +37,7 @@ class Table:
 
 
 class Player:
-
+    """ Player describing. If .human is False the engine played.  """
     pref_indx: int = 0
     pref_incr: int = DIR_RT
 
@@ -54,10 +53,11 @@ class Player:
         Table.items[self.name] = sum(self.items)
 
     def ask(self):
+        """ Asking human for his turn. Result write down to the Player's variables """
         n=0 
         n = input('{0}: Input index of item [{1}-{2}]:'.format(self.name, 0, len(self.items)-1))
         if n == 'q':
-            return False
+            quit()
         if n.isdigit():
             self.pref_indx = int(n)
             d = input("{0}: Input direction (l | r):".format(self.name))
@@ -65,11 +65,56 @@ class Player:
                 self.pref_incr = DIR_LT
             if d == 'r':
                 self.pref_incr = DIR_RT
-        return True
+            return Table.free_cell(Table.moveto(self.items[self.pref_indx], self.upward, self.pref_incr))
+        return False
+
+    def prepare(self):
+        """
+        Main engine. Try to win by reaching a far line with own figure and reduce loss of it own turns.
+
+        Returning tuple consist:
+            id of piece,
+            direction of movement,
+            loss of turns by moving this piece,
+            count steps to reach of far line to bifurcation.  
+        """
+        self.pref_indx = 0
+        self.pref_incr = DIR_RT
+
+        turns = []
+        for idx, item in enumerate(self.items):
+            base_items, base_destinition = self.calculate(item)
+            turns_count = len(list(set(base_items)))
+            for incr in [DIR_LT, DIR_RT]:
+                nt = Table.moveto(item, self.direction, incr)
+                if Table.free_cell(nt):
+                    ret, l = self.calculate(nt)
+                    t = len(list(set(ret)))
+                    turns.append((idx, incr, turns_count-t, l))
+
+        turns.sort(key = lambda x: (x[3], x[2]))
+        self.pref_indx = turns[0][0]
+        self.pref_incr = turns[0][1]
+#        print(turns)
+
+    def calculate(self, item):
+        """ Returning of list of cells which piece may to visit. And count steps to far line """
+        l = 64
+        ret = [item]
+        if item & self.edgerow > 0:
+            l = 1
+        else:
+            for d in [DIR_RT, DIR_LT]:
+                c = item<<d if self.upward else item>>d
+                if Table.free_cell(c):
+                    _c, _l = self.calculate(c)
+                    ret.extend(_c)
+                    if _l < 64:
+                        l = _l+1
+        return ret, l
 
     def turn(self):
-        c = self.items[self.pref_indx]<<self.pref_incr if self.direction == DIR_UP \
-        else self.items[self.pref_indx]>>self.pref_incr 
+        c = Table.moveto(self.items[self.pref_indx], self.upward, self.pref_incr)
         if Table.free_cell(c):
             if c & self.edgerow:
                 self.items.pop(self.pref_indx)
@@ -104,40 +149,6 @@ class Player:
                 n+=1
         return n
 
-    def prepare(self):
-        self.pref_indx = 0
-        self.pref_incr = DIR_RT
-        cur = 0
-        cnt = 0
-        for idx, item in enumerate(self.items):
-            base_items, base_destinition = self.calculate(item)
-            turns_count = len(list(set(base_items)))
-            for incr in [DIR_LT, DIR_RT]:
-                nt = Table.moveto(item, self.direction, incr)
-                if Table.free_cell(nt):
-                    ret, l = self.calculate(nt)
-                    t = len(list(set(ret)))
-                    if (turns_count-t) <= cnt:
-                        self.pref_indx = idx
-                        self.pref_incr = incr
-                        cnt=(turns_count-t)
-        print(self.pref_indx, self.pref_incr, cur, cnt)
-
-    def calculate(self, item):
-        l = 0
-        ret = [item]
-        if item & self.edgerow > 0:
-            l = 1
-        else:
-            for d in [DIR_RT, DIR_LT]:
-                c = item<<d if self.upward else item>>d
-                if Table.free_cell(c):
-                    _c, _l = self.calculate(c)
-                    ret.extend(_c)
-                    if _l:
-                        l = _l+1
-        return ret, l
-
 
 def display(val):
     s = format(val, 'b').zfill(64)[::-1]
@@ -164,7 +175,7 @@ if __name__ == "__main__":
             if p.human:
                 Table.show_board()
                 while not p.ask():
-                    pass
+                    print("{}: You cannot do this.".format(p.name))    
             else:
                 p.prepare()
             p.turn()
