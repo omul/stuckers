@@ -9,6 +9,7 @@ class Table:
     """ Global functions and communication between players. """
     board = 0xaa55aa55aa55aa55
     items = {}
+    debut = True
     
     def show_board():
         l = list(Table.items.values())
@@ -68,7 +69,7 @@ class Player:
             return Table.free_cell(Table.moveto(self.items[self.pref_indx], self.upward, self.pref_incr))
         return False
 
-    def prepare(self):
+    def rank(self):
         """
         Main engine. Try to win by reaching a far line with own figure and reduce loss of it own turns.
 
@@ -177,7 +178,7 @@ if __name__ == "__main__":
                 while not p.ask():
                     print("{}: You cannot do this.".format(p.name))    
             else:
-                p.prepare()
+                p.rank()
             p.turn()
 
 
